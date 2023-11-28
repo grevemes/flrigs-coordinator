@@ -1,172 +1,160 @@
-import xmlrpc.client
-import time
-import configparser
-import getopt, sys
+# flrigs-coordinator.py
+# Authors: Steve, N8IFQ.  Sean, W8FU
+# Organization: Flying Beers International Radio Club
+# Description: A script to coordinate multiple radios controlled by flrig.
 
-# Default config file.
+import xmlrpc.client
+import configparser
+import sys
+import argparse
+
+version = "1.0"
 config_file = 'flrigs-coordinator.ini'
 
-def display_help():
-    print('W8FU Radio Interface Coordinator')
-    print('Config File is: {config_file}')
+def connect(radio):
+    try:
+        if not config.has_section(radio):
+            raise Exception(f'No configuration defined for {radio}')
 
-    print('-h or --Help    Display this message')
-    print('-c or --config  Specify config file')
+        server = config[radio]['server']
+        port = config[radio]['port']
+        server_url = f'http://{server}:{port}'
 
-    print('Radio A Options')
-    print('-a or --show_a   Display Radio A settings')
-    print('--save_a         Save Radio A settings')
-    print('--restore_a      Restore Radio A settings')
+        # Connect to the flrig server
+        flrig = xmlrpc.client.ServerProxy(server_url)
+        version = flrig.main.get_version()
+        if args.debug:
+            print(f'{radio}: Connected to flrig version {version} at {server_url}')
 
-    print('Radio B Options')
-    print('-b or --show_b   Display Radio B settings')
-    print('--save_b         Save Radio B settings')
-    print('--restore_b      Restore Radio B settings')
-    
-    print('Functions')
-    print('--set_a_b        Copy settings from Radio A to Radio B [A->B]')
-    print('--set_b_a        Copy settings from Radio B to Radio A [B->A]')
+        return flrig
 
-    print('Configuration')
-    print('Radio A is ', display_radio(config, 'A'))
-    print('Radio B is ', display_radio(config, 'B'))
+    except Exception as e:
+        print(str(e))
+        sys.exit()
 
-
-def display_radio(config, radio):
-    section = f'RADIO{radio}'
-
-    # Connect to the flrig server
-    name = config[section]['name']
-    server = config[section]['server']
-    port = config[section]['port']
-    server_url = f'http://{server}:{port}'
-
-    flrig = xmlrpc.client.ServerProxy(server_url)
-    #version = flrig.main.get_version()
-    #print(f'Connected to flrig version {version} at {server_url}')
+def show(args):
+    flrig = connect(args.radio)
+    if args.debug:
+        print(f'{args.radio}: {config[args.radio]["description"]}')
 
     power = flrig.rig.get_power()
     frequency = flrig.rig.get_vfo()
     mode = flrig.rig.get_mode()
-    return f'{name} {frequency}Hz {mode} {power}W'
 
-def save_radio(config, radio):
-    section = f'RADIO{radio}'
+    print(f'{args.radio}: "{config[args.radio]["description"]}" {frequency}Hz {mode} {power}W')
+    return
 
-    # Connect to the flrig server
-    name = config[section]['name']
-    server = config[section]['server']
-    port = config[section]['port']
-    server_url = f'http://{server}:{port}'
+def save(radio):
+    flrig = connect(args.radio)
+    if args.debug:
+        print(f'{args.radio}: {config[args.radio]["description"]}')
 
-    flrig = xmlrpc.client.ServerProxy(server_url)
     frequency = flrig.rig.get_vfo()
     mode = flrig.rig.get_mode()
 
-    config[section]['frequency'] = frequency
-    config[section]['mode'] = mode
-    with open(config_file, 'w') as configfile:
-        config.write(configfile)
+    config[args.radio]['frequency'] = frequency
+    config[args.radio]['mode'] = mode
 
-def restore_radio(config, radio):
-    section = f'RADIO{radio}'
+    try:
+        with open(args.config, 'w') as configfile:
+            config.write(configfile)
 
-    frequency = config[section]['frequency']
-    mode = config[section]['mode']
-    
-    # Connect to the flrig server
-    name = config[section]['name']
-    server = config[section]['server']
-    port = config[section]['port']
-    server_url = f'http://{server}:{port}'
+        print(f'Saving {args.radio} settings of {frequency} {mode}')
 
-    print(f'Resorting {name} to {frequency} {mode}')
-    flrig = xmlrpc.client.ServerProxy(server_url)
+    except Exception as e:
+        print(str(e))
+        sys.exit()
+
+
+def restore(radio):
+    flrig = connect(args.radio)
+    if args.debug:
+        print(f'{args.radio}: {config[args.radio]["description"]}')
+
+    frequency = config[args.radio]['frequency']
+    mode = config[args.radio]['mode'] 
+
+    print(f'Resorting {args.radio} to {frequency} {mode}')
     flrig.rig.set_vfo(float(frequency))
     flrig.rig.set_mode(mode)
 
-def cross_set(config, src, dest):
-    src_section = f'RADIO{src}'
-    dest_section = f'RADIO{dest}'
+def set(args):
+    if args.debug:
+        print(f'In Set Function. src={args.src_radio} dest={args.dest_radio}')
+
+    src_flrig = connect(args.src_radio)
+    dest_flrig = connect(args.dest_radio)
 
     # Get the Source values
-    src_name = config[src_section]['name']
-    src_server = config[src_section]['server']
-    src_port = config[src_section]['port']
-
-    src_flrig = xmlrpc.client.ServerProxy(f'http://{src_server}:{src_port}')
     src_frequency = src_flrig.rig.get_vfo()
     src_mode = src_flrig.rig.get_mode()
 
-    # Get the Destination Location
-    dest_name = config[dest_section]['name']
-    dest_server = config[dest_section]['server']
-    dest_port = config[dest_section]['port']
-
-    dest_flrig =  xmlrpc.client.ServerProxy(f'http://{dest_server}:{dest_port}')
+    # Set the Destination Location
     dest_flrig.rig.set_vfo(float(src_frequency))
     dest_flrig.rig.set_mode(src_mode)
 
-    print(f'Copy settings from  {src_name} to {dest_name}: {src_frequency} {src_mode}')
+    print(f'Copy settings from {args.src_radio} to {args.dest_radio} : {src_frequency} {src_mode}')
+
+def swap(args):
+    if args.debug:
+        print(f'In Swap Function. src={args.src_radio} dest={args.dest_radio}')
+
+    src_flrig = connect(args.src_radio)
+    dest_flrig = connect(args.dest_radio)
+
+    # Temp store the values
+    tmp_frequency = dest_flrig.rig.get_vfo()
+    tmp_mode = dest_flrig.rig.get_mode()
+
+    # Set Dest Radio to Src Radio Values
+    dest_flrig.rig.set_vfo(float(src_flrig.rig.get_vfo()))
+    dest_flrig.rig.set_mode(src_flrig.rig.get_mode())
+
+    # Set Src Radio to saved values
+    src_flrig.rig.set_vfo(float(tmp_frequency))
+    src_flrig.rig.set_mode(tmp_mode)
+
+    print(f'Swap settings from {args.src_radio} to {args.dest_radio}')
 
 
-# Get Configuration 
-config = configparser.ConfigParser()
+if __name__ == "__main__":
+    # Argument Handling
+    parser = argparse.ArgumentParser(
+        prog="flrigs-coordinator",
+        description="Coordinate settings across multiple flrig instances",
+        argument_default=argparse.SUPPRESS
+    )
+    subparsers = parser.add_subparsers()
 
-argumentList = sys.argv[1:]
-options = "habc"
-long_options = ["help", "config", "show_a", "show_b", "set_b_a", "set_a_b", "save_a", "save_b", "restore_a","restore_b"]
+    parser_show = subparsers.add_parser('show', help="Display current radio settings")
+    parser_show.add_argument('radio')
+    parser_show.set_defaults(func=show)
 
-try:
-    # Parsing argument
-    arguments, values = getopt.getopt(argumentList, options, long_options)
+    parser_save = subparsers.add_parser('save', help="Store the current radio settings")
+    parser_save.add_argument('radio')
+    parser_save.set_defaults(func=save)
 
-    # Check for config file specification
-    for currentArgument, currentValue in arguments:
-         if currentArgument in ("-c", "--config"):
-            config_file = currentValue
+    parser_restore = subparsers.add_parser('restore', help="Restore the radio settings from saved values")
+    parser_restore.add_argument('radio')
+    parser_restore.set_defaults(func=restore)
 
-    # Get config data
-    config.read(config_file)
+    parser_set = subparsers.add_parser('set', help="Set destination radio to match the source radio settings")
+    parser_set.add_argument("src_radio")
+    parser_set.add_argument("dest_radio")
+    parser_set.set_defaults(func=set)
 
-    # checking each argument
-    for currentArgument, currentValue in arguments:
- 
-        if currentArgument in ("-h", "--help"):
-            display_help()
+    parser_swap = subparsers.add_parser('swap', help="Swap the settings between two radios")
+    parser_swap.add_argument("src_radio")
+    parser_swap.add_argument("dest_radio")
+    parser_swap.set_defaults(func=swap)
 
-        elif currentArgument in ("-a", "--show_a"):
-            print ("Radio A: ", display_radio(config, 'A'))
-        
-        elif currentArgument in ("-b", "--show_b"):
-            print ("Radio B: ", display_radio(config, 'B'))
-             
-        elif currentArgument in ("--save_a"):
-            print ("Saving Radio A state")
-            save_radio(config, 'A')
+    parser.add_argument("-v", "--version", action="version", version="%(prog)s " + version)
+    parser.add_argument("-c", "--config", action="store", default=config_file)
+    parser.add_argument("-d", "--debug", action="store_true", default=False)
 
-        elif currentArgument in ("--save_b"):
-            print ("Saving Radio B state")
-            save_radio(config, 'B')
+    args = parser.parse_args()
+    config = configparser.ConfigParser()
+    config.read(args.config)
 
-        elif currentArgument in ("--restore_a"):
-            print ("Restoring Radio A state")
-            restore_radio(config, 'A')
-
-        elif currentArgument in ("--restore_b"):
-            print ("Restoring Radio B state")
-            restore_radio(config, 'B')
-
-        elif currentArgument in ("--set_a_b"):
-            print ("Setting Radio A to match Radio B")
-            cross_set(config, 'A', 'B')
-
-        elif currentArgument in ("--set_b_a"):
-            print ("Setting Radio B to match Radio A")
-            cross_set(config, 'B', 'A')
-             
-except getopt.error as err:
-    # output error, and return with an error code
-    print (str(err))
-
-sys.exit()
+    # Argparser handles dispatch to CLI options.
+    args.func(args)
