@@ -152,6 +152,12 @@ if __name__ == "__main__":
     parser.add_argument("-c", "--config", action="store", default=config_file)
     parser.add_argument("-d", "--debug", action="store_true", default=False)
 
+    # If not options, print help and exit.
+    if len(sys.argv)==1:
+        parser.print_help(sys.stderr)
+        sys.exit(1)
+        
+    
     args = parser.parse_args()
     config = configparser.ConfigParser()
     config.read(args.config)

@@ -1,4 +1,4 @@
-('C:\\Users\\N8IFQ\\dev\\flrigs-cordinator\\build\\flrigs-coordinator\\PYZ-00.pyz',
+('C:\\Users\\N8IFQ\\dev\\flrigs-coordinator\\build\\flrigs-coordinator\\PYZ-00.pyz',
  [('_compat_pickle', 'C:\\Python311\\Lib\\_compat_pickle.py', 'PYMODULE'),
   ('_compression', 'C:\\Python311\\Lib\\_compression.py', 'PYMODULE'),
   ('_py_abc', 'C:\\Python311\\Lib\\_py_abc.py', 'PYMODULE'),
