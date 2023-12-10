@@ -11,6 +11,7 @@ import argparse
 version = "1.0"
 config_file = 'flrigs-coordinator.ini'
 
+
 def connect(radio):
     try:
         if not config.has_section(radio):
@@ -32,6 +33,7 @@ def connect(radio):
         print(str(e))
         sys.exit()
 
+
 def show(args):
     flrig = connect(args.radio)
     if args.debug:
@@ -43,6 +45,7 @@ def show(args):
 
     print(f'{args.radio}: "{config[args.radio]["description"]}" {frequency}Hz {mode} {power}W')
     return
+
 
 def save(radio):
     flrig = connect(args.radio)
@@ -78,6 +81,7 @@ def restore(radio):
     flrig.rig.set_vfo(float(frequency))
     flrig.rig.set_mode(mode)
 
+
 def set(args):
     if args.debug:
         print(f'In Set Function. src={args.src_radio} dest={args.dest_radio}')
@@ -94,6 +98,7 @@ def set(args):
     dest_flrig.rig.set_mode(src_mode)
 
     print(f'Copy settings from {args.src_radio} to {args.dest_radio} : {src_frequency} {src_mode}')
+
 
 def swap(args):
     if args.debug:
@@ -156,8 +161,7 @@ if __name__ == "__main__":
     if len(sys.argv)==1:
         parser.print_help(sys.stderr)
         sys.exit(1)
-        
-    
+
     args = parser.parse_args()
     config = configparser.ConfigParser()
     config.read(args.config)
